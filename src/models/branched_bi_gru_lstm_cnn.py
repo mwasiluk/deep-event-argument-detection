@@ -1,4 +1,4 @@
-from keras.layers import Input, Flatten, Bidirectional, Dropout, concatenate, GRU, Activation
+from keras.layers import Input, Flatten, Bidirectional, Dropout, concatenate, GRU, Activation, Conv1D, MaxPooling1D
 from keras.layers import LSTM, Dense
 from keras.models import Model
 
@@ -15,11 +15,18 @@ def get_model(config, data):
     input_dropout = config['input_dropout']
     lstm_units = config['lstm_units']
     dense_units = config['dense_units']
+    filters = int(config['cnn_filters'])  # def 256
+    cnn_kernel_size = int(config['cnn_kernel_size'])  # def 5
+    pool_size = int(config['pool_size'])  # def 2
 
     sequence_input = Input(shape=(max_sequence_length, input_dims[0]))
     x = sequence_input
     x = Dropout(input_dropout, input_shape=(max_sequence_length,))(x)
     x = Bidirectional(GRU(lstm_units, return_sequences=True, stateful=False))(x)
+
+    x = Conv1D(filters=filters, kernel_size=cnn_kernel_size, padding='valid', activation='relu')(x)
+    x = MaxPooling1D(pool_size=pool_size)(x)
+
     x = Flatten()(x)
 
 
@@ -27,6 +34,10 @@ def get_model(config, data):
     x2 = sequence_input2
     x2 = Dropout(input_dropout, input_shape=(max_sequence_length,))(x2)
     x2 = Bidirectional(LSTM(lstm_units, return_sequences=True, stateful=False))(x2)
+
+    x2 = Conv1D(filters=256, kernel_size=5, padding='valid', activation='relu')(x2)
+    x2 = MaxPooling1D(pool_size=2)(x2)
+
     x2 = Flatten()(x2)
 
     x_arr = [x, x2]
@@ -64,10 +75,11 @@ def get_x_test(training_data):
     return [training_data['x_val'], training_data['x_val']]
 
 def get_x_val(training_data):
-    return [training_data['x_val'], training_data['x_val']]
+    return [training_data['x_val'],training_data['x_val']]
 
 def get_x_val_test(test_data):
-    return [test_data['x_val_test'], test_data['x_val_test']]
+    return [test_data['x_val_test'],test_data['x_val_test']]
+
 
 def get_cv_x_test(fold_data):
     return [fold_data['x_test'], fold_data['x_test']]

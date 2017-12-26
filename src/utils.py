@@ -54,7 +54,18 @@ def print_stats(y_true, y_pred, labels_index, binary):
 
     p_r_f = precision_recall_fscore_support(y_true, y_pred)
     print_p_r_f(p_r_f, labels_index)
-    return p_r_f, acc
+
+    lab = range(1, len(labels_index))
+
+    p_r_f_avg_micro = precision_recall_fscore_support(y_true, y_pred, average='micro', labels=lab)
+    print ('micro averaged:')
+    print(p_r_f_avg_micro)
+
+    print ('weighted averaged:')
+    p_r_f_avg_weighted = precision_recall_fscore_support(y_true, y_pred, average='weighted', labels=lab)
+    print(p_r_f_avg_weighted)
+
+    return p_r_f, acc, p_r_f_avg_micro, p_r_f_avg_weighted
 
 
 def print_p_r_f(p_r_f, labels_index):
@@ -136,9 +147,11 @@ def mkdir_p(path):
             raise
 
 
-def merge_several_folds_results(data, nfolds):
+def merge_several_folds_results(data):
+    data = [[d if d is not None else 0 for d in row] for row in data]
     a = np.array(data[0])
-    for i in range(1, nfolds):
-        a += np.array(data[i])
-    a /= nfolds
+    for i in range(1, len(data)):
+        if not (a is None or data[i] is None):
+            a += np.array(data[i])
+    a /= len(data)
     return a

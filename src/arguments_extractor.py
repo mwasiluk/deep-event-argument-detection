@@ -7,6 +7,7 @@ import sys
 from cStringIO import StringIO
 from optparse import OptionParser
 
+import gc
 import keras
 import numpy as np
 import tensorflow as tf
@@ -15,14 +16,25 @@ from keras.callbacks import ModelCheckpoint
 from sklearn.utils import class_weight
 
 from data import Data
-from models import branched_bi_gru_lstm, bi_gru
+from models import branched_bi_gru_lstm, bi_gru, bi_gru_cnn, bi_gru_2cnn, branched_bi_gru_lstm_cnn, cnn_bi_lstm, bi_lstm_cnn
 from liner2 import create_annotation, get_writer, create_relation
+
 from utils import print_stats, mkdir_p, merge_several_folds_results, print_p_r_f, sliding_window
 from db import DatabaseMng
 
 IRRELEVANT_CLASS = 'n/a'
 
-net_model = branched_bi_gru_lstm
+default_net_model = bi_gru_cnn
+
+MODEL_DICT = {
+    "bi_gru": bi_gru,
+    "bi_gru_cnn": bi_gru_cnn,
+    "bi_lstm_cnn": bi_lstm_cnn,
+    "bi_gru_2cnn": bi_gru_2cnn,
+    "cnn_bi_lstm": cnn_bi_lstm,
+    "branched_bi_gru_lstm": branched_bi_gru_lstm,
+    "branched_bi_gru_lstm_cnn": branched_bi_gru_lstm_cnn
+}
 
 
 def run(config, input_files_index = None, output_file=None, token_sequences_file_name=None, file_to_save_token_sequences=None, model_file=None, train=False, cv=False, input_format="batch:ccl", output_format="batch:ccl"):
@@ -56,6 +68,20 @@ def set_seed(seed):
     tf.set_random_seed(seed)
     rn.seed(seed)
 
+def get_net_model(config):
+    if "model_name" not in config:
+        print("model_name not set in config, using default")
+        return default_net_model
+
+    model_name = config["model_name"]
+
+    try:
+        return MODEL_DICT[model_name]
+    except KeyError:
+        print("unknown model name: %s, using default" % model_name)
+        return default_net_model
+
+
 
 def run_pipe(config, data, model_file, output_file, output_format, db):
 
@@ -79,6 +105,7 @@ def run_pipe(config, data, model_file, output_file, output_format, db):
     from_type_idx = data.indexed_features["token_type"]['from']
     to_type_idx = data.indexed_features["token_type"]['to']
 
+    net_model = get_net_model(config)
 
     while True:
         document = reader.nextDocument()
@@ -129,12 +156,16 @@ def run_pipe(config, data, model_file, output_file, output_format, db):
 
 
 def run_cv(config, data, model_file=None, db=None):
-    data.load()
+
     fold_idx = 0
-    cv_results = []
+    prf_results = []
+    p_r_f_avg_micro_results = []
+    p_r_f_avg_weighted_results = []
     acc_list = []
 
-    for fold_data in data.get_cv_folds_data(config['validation_split']):
+    net_model = get_net_model(config)
+
+    for fold_data in data.get_cv_folds_training_data(config['validation_split']):
         print("Running Fold", fold_idx + 1)
         fold_idx += 1
         model = net_model.get_model(config, data)
@@ -145,22 +176,64 @@ def run_cv(config, data, model_file=None, db=None):
         model_summary = mystdout.getvalue()
 
         train_model(model, config, fold_data)
-        x_test = net_model.get_cv_x_test(fold_data)
+
+        test_reader = fold_data['test_reader']
+        fold_data = None
+        gc.collect()
+
+        test_data = data.get_cv_fold_test_data(test_reader)
+
+
+        x_test = net_model.get_cv_x_test(test_data)
         y_pred = model.predict(x_test)
 
         y_pred = get_y_pred(config, y_pred)
 
-        p_r_f, acc = print_stats(fold_data['y_test'], y_pred, data.labels_index, config['binary'])
+        y_test = test_data['y_test']
+
+        p_r_f, acc, p_r_f_avg_micro, p_r_f_avg_weighted = print_stats(y_test, y_pred, data.labels_index, config['binary'])
+
+        not_matched = test_data['not_matched']
+
+        if len(not_matched):
+            print()
+            print('Computing metrics with not matched true candidates')
+            y_test = y_test.tolist()
+            y_pred = y_pred.tolist()
+            for label in not_matched:
+                for _ in range(not_matched[label]):
+                    y_test.append(data.get_label_from_idx(data.labels_index[label]))
+
+                    y_pred.append(data.get_label_from_idx(data.labels_index[data.irrelevant_class]))
+
+            p_r_f, acc, p_r_f_avg_micro, p_r_f_avg_weighted = print_stats(np.array(y_test), np.array(y_pred),
+                                                                          data.labels_index, config['binary'])
+
+
+
         acc_list.append(acc)
-        cv_results.append(p_r_f)
+        prf_results.append(p_r_f)
+        p_r_f_avg_micro_results.append(p_r_f_avg_micro)
+        p_r_f_avg_weighted_results.append(p_r_f_avg_weighted)
+
         if model_file:
             data.save_model(model, model_file+"_fold_"+str(fold_idx))
-    cv_prf = merge_several_folds_results(cv_results, fold_idx)
+
+    cv_prf = merge_several_folds_results(prf_results)
+    cv_p_r_f_avg_micro = merge_several_folds_results(p_r_f_avg_micro_results)
+    p_r_f_avg_weighted_prf = merge_several_folds_results(p_r_f_avg_weighted_results)
+
     print_p_r_f(cv_prf, data.labels_index)
+
+    print('micro averaged:')
+    print(cv_p_r_f_avg_micro)
+
+    print('weighted averaged:')
+    print(p_r_f_avg_weighted_prf)
 
     if db:
         db.save_result(config, np.mean(acc_list), cv_prf, model_summary, data.num_classes, np.array([]), labels_index=data.labels_index,
-                       model_id=model_file)
+                       model_id=model_file, p_r_f_avg_micro = cv_p_r_f_avg_micro, p_r_f_avg_weighted = p_r_f_avg_weighted_prf)
 
 def get_y_pred(config, y_pred):
     if config['binary']:
@@ -169,19 +242,47 @@ def get_y_pred(config, y_pred):
 
 
 def run_train(config, data, model_file, db=None):
+    net_model = get_net_model(config)
     data.load()
     training_data = data.get_training_data(config['validation_split'])
     model = net_model.get_model(config, data)
     model.summary()
+
+    gc.collect()
     tr = train_model(model, config, training_data)
-    x_test = net_model.get_x_test(training_data)
-    y_test = training_data['y_val']
+
+    training_data = None
+    gc.collect()
+
+    test_data = data.get_validation_test_data(config['validation_split'])
+
+
+
+    x_test = net_model.get_x_val_test(test_data)
+    y_test = test_data['y_val_test']
     y_pred = model.predict(x_test)
     y_pred = get_y_pred(config, y_pred)
 
-    p_r_f, acc = print_stats(y_test, y_pred, data.labels_index, config['binary'])
+    p_r_f, acc, p_r_f_avg_micro, p_r_f_avg_weighted = print_stats(y_test, y_pred, data.labels_index, config['binary'])
     if model_file:
         data.save_model(model, model_file)
+
+
+    not_matched = test_data['not_matched']
+
+    if len(not_matched):
+        print()
+        print ('Computing metrics with not matched true candidates')
+        y_test = y_test.tolist()
+        y_pred = y_pred.tolist()
+        for label in not_matched:
+            for _ in range(not_matched[label]):
+                y_test.append(data.get_label_from_idx(data.labels_index[label]))
+
+                y_pred.append(data.get_label_from_idx(data.labels_index[data.irrelevant_class]))
+
+        p_r_f, acc, p_r_f_avg_micro, p_r_f_avg_weighted = print_stats(np.array(y_test), np.array(y_pred), data.labels_index, config['binary'])
+
 
     sys.stdout = mystdout = StringIO()
     model.summary()
@@ -192,9 +293,10 @@ def run_train(config, data, model_file, db=None):
     if db:
         db.init()
         db.save_result(config, acc, p_r_f, model_summary, data.num_classes, tr["class_weights"], labels_index=data.labels_index,
-                       model_id=model_file)
+                       model_id=model_file, p_r_f_avg_micro = p_r_f_avg_micro, p_r_f_avg_weighted = p_r_f_avg_weighted)
 
 def train_model(model, config, training_data):
+    net_model = get_net_model(config)
     print('Training model.')
     # compute balanced class weights
     if config['binary']:
@@ -215,8 +317,8 @@ def train_model(model, config, training_data):
     if config['binary']:
         loss = 'binary_crossentropy'
 
-    train_inputs = [training_data['x_train'], training_data['x_train']]
-    val_inputs = [training_data['x_val'], training_data['x_val']]
+    train_inputs = net_model.get_x_train(training_data)
+    val_inputs = net_model.get_x_val(training_data)
 
     model.compile(loss=loss,
                   optimizer=optimizers.Adam(lr=config['lr'], decay=config['lr_decay']),

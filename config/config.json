@@ -1,16 +1,18 @@
 {
+  "model_name" : "bi_gru_cnn",
   "seed": 1337,
   "batch_size": 2024,
-  "epochs": 50,
+  "epochs": 100,
   "single_class": false,
   "binary": false,
   "relations": [{
     "types": ["ag", "ben", "loc"],
     "from": ["action", "state", "aspectual", "i_state", "reporting", "perception", "light_predicate"],
     "to": ["nam_.+"],
-    "allow_reversed": true
+    "allow_reversed": true,
+    "candidate_sentence_distance_limit": 1
   }],
-  "map_annotations_enabled": false,
+  "map_annotations_enabled": true,
   "map_annotations":[
     {
       "from": "nam_liv_person.*",
@@ -46,7 +48,7 @@
   "w2v_embeddings": {
     "orth": {
       "path": "/home/michal/dev/ipi/embeddings/orth/w2v_allwiki_nkjpfull_300.model",
-      "enabled": true,
+      "enabled": false,
       "attributes": [
         "orth"
       ]
@@ -124,29 +126,40 @@
     }
   },
   "indexed_embeddings": {
-    "annotation": 500,
-    "dependency": 500,
+    "annotation": 263,
+    "dependency_bag": 300,
+    "dependency_path_from": 200,
     "token_type": 2
   },
   "position_embedding_dim": 3,
   "validation_split": 0.2,
-  "balanced_split": true,
-  "window_size": 5,
+  "balanced_split": false,
+  "validation_split_by_whole_docs": true,
+  "window_size": 4,
   "input_dropout": 0.4,
   "lstm_units": 14,
   "lstm_units2": 14,
   "dense_units": 100,
+  "cnn_kernel_size": 2,
+  "cnn_filters": 256,
+  "pool_size": 2,
+
+  "dependency_path_short_as_bag": false,
+  "distance_feature": false,
+  "sentence_distance_feature": false,
+  "dependency_to_conjuct_in_diff_sents": true,
 
   "lr": 0.001,
   "lr_decay": 1e-6,
   "no_duplicate_tokens_in_merged_seq": true,
-  "train_candidate_ratio": 0.1,
+  "train_candidate_ratio": 0.15,
   "db":{
     "enabled": true,
     "dbname": "deep",
-    "table_name": "arguments",
+    "table_name": "arguments_cv",
     "user": "deep",
     "host": "localhost",
     "password": "haslo"
   }
+
 }

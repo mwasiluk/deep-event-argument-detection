@@ -25,6 +25,8 @@ class DatabaseMng:
                   id serial,
                   config jsonb,
                   p_r_f jsonb,
+                  p_r_f_avg_micro jsonb,
+                  p_r_f_avg_weighted jsonb,
                   acc double precision,
                   model_summary text,
                   model_id text,
@@ -49,9 +51,11 @@ class DatabaseMng:
         self.connect()
         self.create_table()
 
-    def save_result(self, config, acc, p_r_f, model_summary, num_classes, class_weights, labels_index, model_id):
+    def save_result(self, config, acc, p_r_f, model_summary, num_classes, class_weights, labels_index, model_id, p_r_f_avg_micro = None, p_r_f_avg_weighted = None):
 
         prf = {}
+        prf_avg_micro = {}
+        prf_avg_weighted = {}
         m = ['P', 'R', "F1", "S"]
 
         for i,a in enumerate(p_r_f):
@@ -59,14 +63,22 @@ class DatabaseMng:
             for vi, v in enumerate(a.tolist()):
                 prf[m[i]][labels_index.keys()[labels_index.values().index(vi)]] = v
 
+        for i,m in enumerate(m):
+            if p_r_f_avg_micro is not None:
+                prf_avg_micro[m]=p_r_f_avg_micro[i]
+            if p_r_f_avg_weighted is not None:
+                prf_avg_weighted[m]=p_r_f_avg_weighted[i]
+
         try:
             cur = self.conn.cursor()
 
-            cur.execute("""INSERT INTO """+self.table_name+"""(config,acc, p_r_f, model_summary, num_classes, class_weights, labels_index, model_id) VALUES (%(config)s, %(acc)s, %(p_r_f)s, %(model_summary)s, %(num_classes)s, %(class_weights)s, %(labels_index)s, %(model_id)s)""",
+            cur.execute("""INSERT INTO """+self.table_name+"""(config,acc, p_r_f, p_r_f_avg_micro, p_r_f_avg_weighted, model_summary, num_classes, class_weights, labels_index, model_id) VALUES (%(config)s, %(acc)s, %(p_r_f)s, %(p_r_f_avg_micro)s, %(p_r_f_avg_weighted)s, %(model_summary)s, %(num_classes)s, %(class_weights)s, %(labels_index)s, %(model_id)s)""",
                         {
                             'config': json.dumps(config),
                             'acc': acc,
                             'p_r_f': json.dumps(prf),
+                            'p_r_f_avg_micro': json.dumps(prf_avg_micro),
+                            'p_r_f_avg_weighted': json.dumps(prf_avg_weighted),
                             'model_summary': model_summary,
                             'model_id': str(model_id),
                             'num_classes': num_classes,
