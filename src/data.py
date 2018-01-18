@@ -334,8 +334,13 @@ class Data(object):
 
         self.input_dims = [self.input_dim]
 
-        if not len(self.labels_index):
-            self.labels_index[self.irrelevant_class] = 0
+        if len(self.labels_index) <= 1:
+            self.init_rel_types_label_indexes()
+
+            self.num_classes = len(self.labels_index)
+
+
+
 
         for fold_index, test_fold in enumerate(folds):
             test_index = fold_index
@@ -584,6 +589,7 @@ class Data(object):
         # labels_index = {}  # dictionary mapping label name to numeric id
         if not len(self.labels_index):
             self.labels_index[self.irrelevant_class] = 0
+
 
         all_sequences = []
         for reader in readers:
@@ -1085,13 +1091,7 @@ class Data(object):
                     if assign_id_to_annotations and not to_candidate.getId():
                         to_candidate.setId(str(int(round(time.time() * 1000))))
 
-
-                    if label in self.labels_index:
-                        label_index = self.labels_index[label]
-                    else:
-                        label_index = len(self.labels_index)
-                        self.labels_index[label] = label_index
-
+                    label_index = self.get_label_index(label)
                     # print(label, position)
                     to_candidate_seq = self.get_local_sequence(sentences, to_candidate_position, 'to')
 
@@ -1225,7 +1225,23 @@ class Data(object):
         # exit()
         return sequences, not_matched_rel_count_dict
 
+    def get_label_index(self, label, init_rel_types_if_empty=True):
+        if init_rel_types_if_empty and len(self.labels_index) <= 1:
+            self.init_rel_types_label_indexes()
 
+        if label in self.labels_index:
+            label_index = self.labels_index[label]
+        else:
+            label_index = len(self.labels_index)
+            self.labels_index[label] = label_index
+
+        return label_index
+
+    def init_rel_types_label_indexes(self):
+        self.labels_index[self.irrelevant_class] = 0
+        for rel_conf in self.config['relations']:
+            for t in rel_conf['types']:
+                self.get_label_index(t, False)
 
     def get_annotations_from_Sentence(self, sentence):
         return sentence.getAnnotations(self.annotation_types)

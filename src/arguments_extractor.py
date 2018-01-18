@@ -191,6 +191,15 @@ def run_cv(config, data, model_file=None, db=None):
 
         y_test = test_data['y_test']
 
+
+        y_test = y_test.tolist()
+        y_pred = y_pred.tolist()
+        for l in data.labels_index:
+            y_test.append(data.get_label_from_idx(data.labels_index[l]))
+            y_pred.append(data.get_label_from_idx(data.labels_index[data.irrelevant_class]))
+
+        y_test = np.array(y_test)
+        y_pred = np.array(y_pred)
         p_r_f, acc, p_r_f_avg_micro, p_r_f_avg_weighted = print_stats(y_test, y_pred, data.labels_index, config['binary'])
 
         not_matched = test_data['not_matched']

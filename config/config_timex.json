@@ -6,9 +6,9 @@
   "single_class": false,
   "binary": false,
   "relations": [{
-    "types": ["ag", "ben", "loc"],
+    "types": ["tlink_aft", "tlink_bef", "tlink_beg", "tlink_beg_by", "tlink_dur", "tlink_end", "tlink_end_by", "tlink_i_aft", "tlink_i_bef", "tlink_ide", "tlink_inc", "tlink_is_inc", "tlink_sim"],
     "from": ["action", "state", "aspectual", "i_state", "reporting", "perception", "light_predicate"],
-    "to": ["nam_.+"],
+    "to": ["t3_.+", "action", "state", "aspectual", "i_state", "reporting", "perception", "light_predicate"],
     "allow_reversed": true,
     "candidate_sentence_distance_limit": 1
   }],
@@ -17,13 +17,6 @@
     {
       "from": "nam_liv_person.*",
       "to": "nam_liv_person"
-    },
-     {
-      "from": "nam_adj.*",
-      "to": "nam_adj"
-    },{
-      "from": "nam_eve.*",
-      "to": "nam_adj"
     },
     {
       "from": "nam_loc.*",
@@ -163,7 +156,7 @@
   "db":{
     "enabled": true,
     "dbname": "deep",
-    "table_name": "arguments_cv",
+    "table_name": "arguments_timex_cv",
     "user": "deep",
     "host": "localhost",
     "password": "haslo"
