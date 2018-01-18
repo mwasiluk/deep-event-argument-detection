@@ -10,7 +10,7 @@
     "from": ["action", "state", "aspectual", "i_state", "reporting", "perception", "light_predicate"],
     "to": ["t3_.+", "action", "state", "aspectual", "i_state", "reporting", "perception", "light_predicate"],
     "allow_reversed": true,
-    "candidate_sentence_distance_limit": 1
+    "candidate_sentence_distance_limit": 0
   }],
   "map_annotations_enabled": true,
   "map_annotations":[
@@ -55,7 +55,7 @@
   "w2v_embeddings": {
     "orth": {
       "path": "/home/michal/dev/ipi/embeddings/orth/w2v_allwiki_nkjpfull_300.model",
-      "enabled": false,
+      "enabled": true,
       "attributes": [
         "orth"
       ]
@@ -89,7 +89,7 @@
     },
     "class": {
       "path": "/home/michal/dev/ipi/embeddings/class/wiki_axw_st_30_25i_5w.model",
-      "enabled": false,
+      "enabled": true,
       "attributes": [
         "class"
       ]
@@ -142,13 +142,13 @@
   "validation_split": 0.2,
   "balanced_split": false,
   "validation_split_by_whole_docs": true,
-  "window_size": 4,
+  "window_size": 2,
   "input_dropout": 0.4,
-  "lstm_units": 14,
-  "lstm_units2": 14,
+  "lstm_units": 200,
+  "lstm_units2": 200,
   "dense_units": 100,
   "cnn_kernel_size": 2,
-  "cnn_filters": 256,
+  "cnn_filters": 64,
   "pool_size": 2,
 
   "dependency_path_short_as_bag": false,
@@ -159,7 +159,7 @@
   "lr": 0.001,
   "lr_decay": 1e-6,
   "no_duplicate_tokens_in_merged_seq": true,
-  "train_candidate_ratio": 0.15,
+  "train_candidate_ratio": 0.4,
   "db":{
     "enabled": true,
     "dbname": "deep",
