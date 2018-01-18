@@ -18,6 +18,13 @@
       "from": "nam_liv_person.*",
       "to": "nam_liv_person"
     },
+     {
+      "from": "nam_adj.*",
+      "to": "nam_adj"
+    },{
+      "from": "nam_eve.*",
+      "to": "nam_adj"
+    },
     {
       "from": "nam_loc.*",
       "to": "nam_loc"
